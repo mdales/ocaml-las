@@ -7,7 +7,7 @@ let ok_header = Alcotest.(result (of_pp Las.pp_header) (of_pp Las.pp_error))
 
 let test_valid_magic () =
   let result = Las.of_buffer (make_buf "LASF\x00\x00\x00\x00") in
-  let expected = Las.v 0 (0, 0) in
+  let expected = Las.v 0 0 (0, 0) in
   Alcotest.(check ok_header) "valid magic" (Ok expected) result
 
 let test_wrong_magic () =
