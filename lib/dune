@@ -1,0 +1,3 @@
+(library
+ (name oclas)
+ (libraries eio))
