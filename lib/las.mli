@@ -1,3 +1,13 @@
-(* type t *)
+type error =
+  | Invalid_file_signature
+  | Unsupported_version of int * int
+  | Truncated of string   (* field name *)
 
-val of_buffer :  Eio.Buf_read.t -> (bool, string) result
+type t
+
+val v: int -> int * int -> t
+
+val of_buffer : Eio.Buf_read.t -> (t, error) result
+
+val pp_error : Format.formatter -> error -> unit
+val pp_header : Format.formatter -> t -> unit
