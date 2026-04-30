@@ -28,6 +28,9 @@ val v :
   int ->
   int ->
   int list ->
+  float ->
+  float ->
+  int ->
   t
 
 val of_buffer : Eio.Buf_read.t -> (t, Util.error) result

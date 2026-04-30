@@ -23,11 +23,17 @@ type t = {
   offset : float * float * float;
   min : float * float * float;
   max : float * float * float;
+  (* 1.3 onwards *)
   start_of_waveform_data_packet_record : int;
+  (* 1.4 onwards *)
   start_of_first_extended_variable_length_record : int;
   number_of_extended_variable_length_records : int;
   number_of_point_records : int;
   number_of_points_by_return : int list;
+  (* 1.5 onwards *)
+  max_gps_time : float;
+  min_gps_time : float;
+  time_offset : int;
 }
 
 let las_magic = "LASF"
@@ -87,7 +93,7 @@ let v file_source_id global_encoding version system_identifier
     start_of_waveform_data_packet_record
     start_of_first_extended_variable_length_record
     number_of_extended_variable_length_records number_of_point_records
-    number_of_points_by_return =
+    number_of_points_by_return max_gps_time min_gps_time time_offset =
   {
     file_source_id;
     global_encoding;
@@ -108,6 +114,9 @@ let v file_source_id global_encoding version system_identifier
     number_of_extended_variable_length_records;
     number_of_point_records;
     number_of_points_by_return;
+    max_gps_time;
+    min_gps_time;
+    time_offset;
   }
 
 let of_buffer buf =
@@ -117,6 +126,9 @@ let of_buffer buf =
   let* () = Util.skip_bytes 16 buf in
   (* GUID *)
   let* version = read_version buf in
+  (* We know major version is 1 if we get this far, but we need to track minor version to know
+  how much header to decode. *)
+  let _, minor_version = version in
   let* system_identifier = Util.read_string 32 buf in
   let* generating_software = Util.read_string 32 buf in
   let* () = Util.skip_bytes 4 buf in
@@ -138,20 +150,53 @@ let of_buffer buf =
   let* min_y = Util.read_double buf in
   let* max_z = Util.read_double buf in
   let* min_z = Util.read_double buf in
-  let* start_of_waveform_data_packet_record = Util.read_uint64 buf in
-  let* start_of_first_extended_variable_length_record = Util.read_uint64 buf in
-  let* number_of_extended_variable_length_records = Util.read_uint32 buf in
-  let* number_of_point_records = Util.read_uint64 buf in
-  let* number_of_points_by_return = Util.read_uint64_list buf 15 in
-  Result.Ok
-    (v file_source_id global_encoding version system_identifier
-       generating_software header_size offset_to_point_data vlr_count
-       point_data_record_format point_data_record_length scale offset
-       (min_x, min_y, min_z) (max_x, max_y, max_z)
-       start_of_waveform_data_packet_record
-       start_of_first_extended_variable_length_record
-       number_of_extended_variable_length_records number_of_point_records
-       number_of_points_by_return)
+
+  if minor_version < 3 then
+    Result.Ok
+      (v file_source_id global_encoding version system_identifier
+         generating_software header_size offset_to_point_data vlr_count
+         point_data_record_format point_data_record_length scale offset
+         (min_x, min_y, min_z) (max_x, max_y, max_z) 0 0 0 0 [] 0. 0. 0)
+  else
+    let* start_of_waveform_data_packet_record = Util.read_uint64 buf in
+
+    if minor_version < 4 then
+      Result.Ok
+        (v file_source_id global_encoding version system_identifier
+           generating_software header_size offset_to_point_data vlr_count
+           point_data_record_format point_data_record_length scale offset
+           (min_x, min_y, min_z) (max_x, max_y, max_z)
+           start_of_waveform_data_packet_record 0 0 0 [] 0. 0. 0)
+    else
+      let* start_of_first_extended_variable_length_record =
+        Util.read_uint64 buf
+      in
+      let* number_of_extended_variable_length_records = Util.read_uint32 buf in
+      let* number_of_point_records = Util.read_uint64 buf in
+      let* number_of_points_by_return = Util.read_uint64_list buf 15 in
+      if minor_version < 5 then
+        Result.Ok
+          (v file_source_id global_encoding version system_identifier
+             generating_software header_size offset_to_point_data vlr_count
+             point_data_record_format point_data_record_length scale offset
+             (min_x, min_y, min_z) (max_x, max_y, max_z)
+             start_of_waveform_data_packet_record
+             start_of_first_extended_variable_length_record
+             number_of_extended_variable_length_records number_of_point_records
+             number_of_points_by_return 0. 0. 0)
+      else
+        let* max_gps_time = Util.read_double buf in
+        let* min_gps_time = Util.read_double buf in
+        let* time_offset = Util.read_uint16 buf in
+        Result.Ok
+          (v file_source_id global_encoding version system_identifier
+             generating_software header_size offset_to_point_data vlr_count
+             point_data_record_format point_data_record_length scale offset
+             (min_x, min_y, min_z) (max_x, max_y, max_z)
+             start_of_waveform_data_packet_record
+             start_of_first_extended_variable_length_record
+             number_of_extended_variable_length_records number_of_point_records
+             number_of_points_by_return max_gps_time min_gps_time time_offset)
 
 let global_encoding t = t.global_encoding
 let version t = t.version
@@ -184,7 +229,8 @@ let pp_header fmt t =
      %f); start_of_waveform_data_packet_record = 0x%x; \
      start_of_first_extended_variable_length_record = 0x%x;\n\
     \      number_of_extended_variable_length_records = %d; \
-     number_of_point_records = %d; number_of_points_by_return = [%a]}"
+     number_of_point_records = %d; number_of_points_by_return = [%a]; \
+     max_gps_time = %f; min_gps_time = %f; time_offset = %d }"
     t.file_source_id
     (Format.pp_print_list pp_encoding)
     t.global_encoding version_major version_minor t.system_identifier
@@ -196,4 +242,4 @@ let pp_header fmt t =
     t.start_of_first_extended_variable_length_record
     t.number_of_extended_variable_length_records t.number_of_point_records
     (Format.pp_print_list Format.pp_print_int)
-    t.number_of_points_by_return
+    t.number_of_points_by_return t.max_gps_time t.min_gps_time t.time_offset

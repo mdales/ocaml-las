@@ -85,6 +85,7 @@ let test_valid_header () =
       (1, 4) "system" "software" 42 123 234 0 10 (1., 2., 3.) (11., 12., 13.)
       (50., 60., 70.) (500., 600., 700.) 1 2 3 4
       (List.init 15 (fun i -> i + 10))
+      0. 0. 0
   in
   Alcotest.(check ok_header) "valid magic" (Ok expected) result
 
