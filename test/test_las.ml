@@ -12,6 +12,11 @@ let bytes_of_uint32_le n =
   Bytes.set_int32_le b 0 (Int32.of_int n);
   Bytes.to_string b
 
+let bytes_of_double_le f =
+  let b = Bytes.create 8 in
+  Bytes.set_int64_le b 0 (Int64.bits_of_float f);
+  Bytes.to_string b
+
 let padded_string s n =
   let l = String.length s in
   match Int.compare l n with
@@ -52,13 +57,31 @@ let test_header =
          (* offset of point data *)
          bytes_of_uint32_le 234;
          (* number of VLR records *)
+         bytes_of_uint8 0;
+         (* point data record format *)
+         bytes_of_uint16_le 10;
+         String.make 24 '\x00';
+         (* legacy point counts *)
+         (* point data record length *)
+         bytes_of_double_le 1.0;
+         bytes_of_double_le 2.0;
+         bytes_of_double_le 3.0;
+         (* scale *)
+         bytes_of_double_le 11.0;
+         bytes_of_double_le 12.0;
+         bytes_of_double_le 13.0;
+         (* offset *)
        ])
 
 let ok_header = Alcotest.(result (of_pp Las.pp_header) (of_pp Las.pp_error))
 
 let test_valid_header () =
   let result = Las.of_buffer test_header in
-  let expected = Las.v 32 [Las.GPS_time_type ; Las.WKT] (1, 4) "system" "software" 42 123 234 in
+  let expected =
+    Las.v 32
+      [ Las.GPS_time_type; Las.WKT ]
+      (1, 4) "system" "software" 42 123 234 0 10 (1., 2., 3.) (11., 12., 13.)
+  in
   Alcotest.(check ok_header) "valid magic" (Ok expected) result
 
 let test_unsupported_major_version () =

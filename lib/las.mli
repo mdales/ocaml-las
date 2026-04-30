@@ -13,10 +13,26 @@ type encoding =
 
 type t
 
-val v : int -> encoding list -> int * int -> string -> string -> int -> int -> int -> t
+val v :
+  int ->
+  encoding list ->
+  int * int ->
+  string ->
+  string ->
+  int ->
+  int ->
+  int ->
+  int ->
+  int ->
+  float * float * float ->
+  float * float * float ->
+  t
+
 val of_buffer : Eio.Buf_read.t -> (t, error) result
+val global_encoding : t -> encoding list
 val version : t -> int * int
 val system_identifier : t -> string
 val generating_software : t -> string
 val pp_error : Format.formatter -> error -> unit
+val pp_encoding : Format.formatter -> encoding -> unit
 val pp_header : Format.formatter -> t -> unit

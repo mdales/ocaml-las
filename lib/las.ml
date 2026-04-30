@@ -20,6 +20,10 @@ type t = {
   header_size : int;
   offset_to_point_data : int;
   vlr_count : int;
+  point_data_record_format : int;
+  point_data_record_length : int;
+  scale : float * float * float;
+  offset : float * float * float;
 }
 
 let las_magic = "LASF"
@@ -35,7 +39,8 @@ let read_magic buf =
       | false -> Error Invalid_file_signature)
   | exception End_of_file -> Error (Truncated "File Signature")
 
-
+let read_byte buf =
+  try Ok (Eio.Buf_read.uint8 buf) with End_of_file -> Error (Truncated "byte")
 
 let read_uint16 buf =
   match Eio.Buf_read.take 2 buf with
@@ -47,6 +52,18 @@ let read_uint32 buf =
   | v -> Ok (Int32.to_int v land 0xFFFFFFFF)
   | exception End_of_file -> Error (Truncated "uint32")
 
+let read_double buf =
+  try
+    let s = Eio.Buf_read.take 8 buf in
+    Ok (Int64.float_of_bits (String.get_int64_le s 0))
+  with End_of_file -> Error (Truncated "double")
+
+let read_double_triple buf =
+  let* x = read_double buf in
+  let* y = read_double buf in
+  let* z = read_double buf in
+  Ok (x, y, z)
+
 let skip_bytes n buf =
   match Eio.Buf_read.skip n buf with
   | () -> Ok ()
@@ -54,20 +71,22 @@ let skip_bytes n buf =
 
 let read_global_encoding buf =
   let* encoding = read_uint16 buf in
-  let rencodings = List.init 16 (fun idx ->
-    let bit = (encoding lsr idx) land 0x01 in
-    if bit = 1 then
-      let e = match idx with
-      | 0 -> GPS_time_type
-      | 1 -> Waveform_data_packets_internal
-      | 2 -> Waveform_data_packets_external
-      | 3 -> Synthetic_return_numbers
-      | 4 -> WKT
-      | x -> Unknown x
-      in Some e
-    else
-      None
-  )  in
+  let rencodings =
+    List.init 16 (fun idx ->
+        let bit = (encoding lsr idx) land 0x01 in
+        if bit = 1 then
+          let e =
+            match idx with
+            | 0 -> GPS_time_type
+            | 1 -> Waveform_data_packets_internal
+            | 2 -> Waveform_data_packets_external
+            | 3 -> Synthetic_return_numbers
+            | 4 -> WKT
+            | x -> Unknown x
+          in
+          Some e
+        else None)
+  in
   let encodings = List.filter_map (fun x -> x) rencodings in
   Ok encodings
 
@@ -94,7 +113,8 @@ let read_string n buf =
 (* Public *)
 
 let v file_source_id global_encoding version system_identifier
-    generating_software header_size offset_to_point_data vlr_count =
+    generating_software header_size offset_to_point_data vlr_count
+    point_data_record_format point_data_record_length scale offset =
   {
     file_source_id;
     global_encoding;
@@ -104,6 +124,10 @@ let v file_source_id global_encoding version system_identifier
     header_size;
     offset_to_point_data;
     vlr_count;
+    point_data_record_format;
+    point_data_record_length;
+    scale;
+    offset;
   }
 
 let of_buffer buf =
@@ -120,10 +144,20 @@ let of_buffer buf =
   let* header_size = read_uint16 buf in
   let* offset_to_point_data = read_uint32 buf in
   let* vlr_count = read_uint32 buf in
+  let* point_data_record_format = read_byte buf in
+  let* point_data_record_length = read_uint16 buf in
+  let* () = skip_bytes 4 buf in
+  (* Legacy number of point records *)
+  let* () = skip_bytes 20 buf in
+  (* Legacy number of point by returns *)
+  let* scale = read_double_triple buf in
+  let* offset = read_double_triple buf in
   Result.Ok
     (v file_source_id global_encoding version system_identifier
-       generating_software header_size offset_to_point_data vlr_count)
+       generating_software header_size offset_to_point_data vlr_count
+       point_data_record_format point_data_record_length scale offset)
 
+let global_encoding t = t.global_encoding
 let version t = t.version
 let system_identifier t = t.system_identifier
 let generating_software t = t.generating_software
@@ -136,18 +170,27 @@ let pp_error fmt = function
 
 let pp_encoding fmt = function
   | GPS_time_type -> Format.fprintf fmt "GPS_time_type"
-  | Waveform_data_packets_internal -> Format.fprintf fmt "Waveform_data_packets_internal"
-  | Waveform_data_packets_external -> Format.fprintf fmt "Waveform_data_packets_external"
+  | Waveform_data_packets_internal ->
+      Format.fprintf fmt "Waveform_data_packets_internal"
+  | Waveform_data_packets_external ->
+      Format.fprintf fmt "Waveform_data_packets_external"
   | Synthetic_return_numbers -> Format.fprintf fmt "Synthetic_return_numbers"
   | WKT -> Format.fprintf fmt "WKT"
   | Unknown bit -> Format.fprintf fmt "Unknown %d" bit
 
 let pp_header fmt t =
   let version_major, version_minor = t.version in
+  let scale_x, scale_y, scale_z = t.scale in
+  let offset_x, offset_y, offset_z = t.offset in
   Format.fprintf fmt
     "{ file_source_id = 0x%x; global_encoding = [%a]; version = %d.%d; \
      system_identifier = \"%s\"; generating_software = \"%s\"; header_size = \
-     0x%x; offset_to_point_data = 0x%x; vlr_count = %d }"
-    t.file_source_id (Format.pp_print_list pp_encoding) t.global_encoding version_major version_minor
-    t.system_identifier t.generating_software t.header_size
-    t.offset_to_point_data t.vlr_count
+     0x%x; offset_to_point_data = 0x%x; vlr_count = %d; \
+     point_data_record_format = 0x%x; point_data_record_length = %d; scale = \
+     (%f, %f, %f); offset = (%f, %f, %f) }"
+    t.file_source_id
+    (Format.pp_print_list pp_encoding)
+    t.global_encoding version_major version_minor t.system_identifier
+    t.generating_software t.header_size t.offset_to_point_data t.vlr_count
+    t.point_data_record_format t.point_data_record_length scale_x scale_y
+    scale_z offset_x offset_y offset_z
