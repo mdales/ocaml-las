@@ -6,6 +6,7 @@ type encoding =
   | Waveform_data_packets_external
   | Synthetic_return_numbers
   | WKT
+  | Time_offset_flag
   | Unknown of int (* bit position *)
 
 type t = {
@@ -67,6 +68,7 @@ let read_global_encoding buf =
             | 2 -> Waveform_data_packets_external
             | 3 -> Synthetic_return_numbers
             | 4 -> WKT
+            | 6 -> Time_offset_flag
             | x -> Unknown x
           in
           Some e
@@ -212,6 +214,7 @@ let pp_encoding fmt = function
       Format.fprintf fmt "Waveform_data_packets_external"
   | Synthetic_return_numbers -> Format.fprintf fmt "Synthetic_return_numbers"
   | WKT -> Format.fprintf fmt "WKT"
+  | Time_offset_flag -> Format.fprintf fmt "Time_offset_flag"
   | Unknown bit -> Format.fprintf fmt "Unknown %d" bit
 
 let pp_header fmt t =

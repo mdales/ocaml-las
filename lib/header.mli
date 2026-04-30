@@ -4,6 +4,7 @@ type encoding =
   | Waveform_data_packets_external
   | Synthetic_return_numbers
   | WKT
+  | Time_offset_flag
   | Unknown of int (* bit position *)
 
 type t
