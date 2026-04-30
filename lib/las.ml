@@ -19,3 +19,15 @@ let of_buffer buf =
 
 let header t = t.header
 let vlrs t = t.vlrs
+
+let projection t =
+  let projection_vlrs =
+    List.filter
+      (fun v ->
+        String.equal "LASF_Projection" (Vlr.user_id v) && Vlr.record_id v = 2112)
+      t.vlrs
+  in
+  match projection_vlrs with
+  | [ x ] -> Vlr.data x
+  | [] -> failwith "No projection found"
+  | _ -> failwith "Multiple projections found"

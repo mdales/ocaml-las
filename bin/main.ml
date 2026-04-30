@@ -15,7 +15,9 @@ let () =
       let header = Las.header las in
       Format.printf "%a\n" Header.pp_header header;
       let vlrs = Las.vlrs las in
-      List.iter (fun vlr -> Format.printf "%a\n" Vlr.pp_vlr vlr) vlrs
+      List.iter (fun vlr -> Format.printf "%a\n" Vlr.pp_vlr vlr) vlrs;
+      let proj = Las.projection las in
+      Format.printf "CRS: %s\n" proj
   | Error e ->
       Format.eprintf "Error: %a\n" Util.pp_error e;
       exit 1

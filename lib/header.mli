@@ -7,6 +7,7 @@ type encoding =
   | Unknown of int (* bit position *)
 
 type t
+(** LAS public header record *)
 
 val v :
   int ->

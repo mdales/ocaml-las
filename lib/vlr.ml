@@ -34,3 +34,8 @@ let pp_vlr fmt t =
      description = \"%s\"; data = %d bytes of data}"
     t.user_id t.record_id t.record_length_after_header t.description
     (String.length t.data)
+
+let user_id t = t.user_id
+let record_id t = t.record_id
+let description t = t.description
+let data t = t.data
