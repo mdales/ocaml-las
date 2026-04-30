@@ -1,4 +1,3 @@
-
 type encoding =
   | GPS_time_type
   | Waveform_data_packets_internal
@@ -36,5 +35,6 @@ val global_encoding : t -> encoding list
 val version : t -> int * int
 val system_identifier : t -> string
 val generating_software : t -> string
+val variable_length_record_count : t -> int
 val pp_encoding : Format.formatter -> encoding -> unit
 val pp_header : Format.formatter -> t -> unit

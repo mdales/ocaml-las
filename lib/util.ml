@@ -1,18 +1,18 @@
 type error =
   | Invalid_file_signature
-  | Corrupt_reserved
+  | Corrupt_reserved of int (* corrupt value *)
   | Unsupported_version of int * int
   | Truncated of string (* field name *)
 
 let pp_error fmt = function
-    | Invalid_file_signature -> Format.fprintf fmt "Invalid_file_signature"
-    | Corrupt_reserved -> Format.fprintf fmt "Corrupt_reserved"
-    | Unsupported_version (maj, min) ->
-        Format.fprintf fmt "Unsupported_version (%d, %d)" maj min
-    | Truncated field -> Format.fprintf fmt "Truncated %S" field
+  | Invalid_file_signature -> Format.fprintf fmt "Invalid_file_signature"
+  | Corrupt_reserved value -> Format.fprintf fmt "Corrupt_reserved: 0x%x" value
+  | Unsupported_version (maj, min) ->
+      Format.fprintf fmt "Unsupported_version (%d, %d)" maj min
+  | Truncated field -> Format.fprintf fmt "Truncated %S" field
 
 module Operators = struct
-    let ( let* ) = Result.bind
+  let ( let* ) = Result.bind
 end
 
 let read_byte buf =
@@ -49,9 +49,9 @@ let read_double buf =
   with End_of_file -> Error (Truncated "double")
 
 let skip_bytes n buf =
-    match Eio.Buf_read.skip n buf with
-    | () -> Ok ()
-    | exception End_of_file -> Error (Truncated "skip")
+  match Eio.Buf_read.skip n buf with
+  | () -> Ok ()
+  | exception End_of_file -> Error (Truncated "skip")
 
 let read_string n buf =
   try
@@ -64,3 +64,7 @@ let read_string n buf =
     in
     Ok (String.sub s 0 len)
   with End_of_file -> Error (Truncated "string")
+
+let read_bytes n buf =
+  try Ok (Eio.Buf_read.take n buf)
+  with End_of_file -> Error (Truncated "bytes")

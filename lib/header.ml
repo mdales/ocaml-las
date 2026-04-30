@@ -32,7 +32,6 @@ type t = {
 
 let las_magic = "LASF"
 
-
 (* Private helpers *)
 
 let read_magic buf =
@@ -74,10 +73,10 @@ let read_version buf =
   try
     let major = Eio.Buf_read.uint8 buf in
     let minor = Eio.Buf_read.uint8 buf in
-    if major <> 1 || minor > 5 then Error (Util.Unsupported_version (major, minor))
+    if major <> 1 || minor > 5 then
+      Error (Util.Unsupported_version (major, minor))
     else Ok (major, minor)
   with End_of_file -> Error (Util.Truncated "version")
-
 
 (* Public *)
 
@@ -158,6 +157,7 @@ let global_encoding t = t.global_encoding
 let version t = t.version
 let system_identifier t = t.system_identifier
 let generating_software t = t.generating_software
+let variable_length_record_count t = t.variable_length_record_count
 
 let pp_encoding fmt = function
   | GPS_time_type -> Format.fprintf fmt "GPS_time_type"
