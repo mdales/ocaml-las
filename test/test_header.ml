@@ -106,13 +106,13 @@ let test_header =
          (* number_of_points_by_return *)
        ])
 
-let ok_header = Alcotest.(result (of_pp Las.pp_header) (of_pp Las.pp_error))
+let ok_header = Alcotest.(result (of_pp Header.pp_header) (of_pp Header.pp_error))
 
 let test_valid_header () =
-  let result = Las.of_buffer test_header in
+  let result = Header.of_buffer test_header in
   let expected =
-    Las.v 32
-      [ Las.GPS_time_type; Las.WKT ]
+    Header.v 32
+      [ Header.GPS_time_type; Header.WKT ]
       (1, 4) "system" "software" 42 123 234 0 10 (1., 2., 3.) (11., 12., 13.)
       (50., 60., 70.) (500., 600., 700.) 1 2 3 4
       (List.init 15 (fun i -> i + 10))
@@ -121,7 +121,7 @@ let test_valid_header () =
 
 let test_unsupported_major_version () =
   let result =
-    Las.of_buffer
+    Header.of_buffer
       (make_buf
          "LASF\x20\x00\x07\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x04")
   in
@@ -132,7 +132,7 @@ let test_unsupported_major_version () =
 
 let test_unsupported_minor_version () =
   let result =
-    Las.of_buffer
+    Header.of_buffer
       (make_buf
          "LASF\x20\x00\x07\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x08")
   in
@@ -142,20 +142,20 @@ let test_unsupported_minor_version () =
     result
 
 let test_wrong_magic () =
-  let result = Las.of_buffer (make_buf "XXXX\x00\x00\x00\x00") in
+  let result = Header.of_buffer (make_buf "XXXX\x00\x00\x00\x00") in
   Alcotest.(check ok_header)
-    "wrong magic" (Error Las.Invalid_file_signature) result
+    "wrong magic" (Error Header.Invalid_file_signature) result
 
 let test_truncated_input () =
   (* Fewer than 4 bytes — the reader should return false, not raise *)
-  let result = Las.of_buffer (make_buf "LAS") in
+  let result = Header.of_buffer (make_buf "LAS") in
   Alcotest.(check ok_header)
-    "truncated input" (Error (Las.Truncated "File Signature")) result
+    "truncated input" (Error (Header.Truncated "File Signature")) result
 
 let test_empty_input () =
-  let result = Las.of_buffer (make_buf "") in
+  let result = Header.of_buffer (make_buf "") in
   Alcotest.(check ok_header)
-    "truncated input" (Error (Las.Truncated "File Signature")) result
+    "truncated input" (Error (Header.Truncated "File Signature")) result
 
 let () =
   Alcotest.run "Las_magic"
