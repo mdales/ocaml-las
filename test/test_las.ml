@@ -30,7 +30,7 @@ let test_header =
          (* magic *)
          bytes_of_uint16_le 32;
          (* file source id *)
-         bytes_of_uint16_le 7;
+         bytes_of_uint16_le 0x11;
          (* global encoding *)
          String.make 16 '\x00';
          (* GUID - currently ignored *)
@@ -58,7 +58,7 @@ let ok_header = Alcotest.(result (of_pp Las.pp_header) (of_pp Las.pp_error))
 
 let test_valid_header () =
   let result = Las.of_buffer test_header in
-  let expected = Las.v 32 7 (1, 4) "system" "software" 42 123 234 in
+  let expected = Las.v 32 [Las.GPS_time_type ; Las.WKT] (1, 4) "system" "software" 42 123 234 in
   Alcotest.(check ok_header) "valid magic" (Ok expected) result
 
 let test_unsupported_major_version () =

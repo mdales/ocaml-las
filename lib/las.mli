@@ -3,9 +3,17 @@ type error =
   | Unsupported_version of int * int
   | Truncated of string (* field name *)
 
+type encoding =
+  | GPS_time_type
+  | Waveform_data_packets_internal
+  | Waveform_data_packets_external
+  | Synthetic_return_numbers
+  | WKT
+  | Unknown of int (* bit position *)
+
 type t
 
-val v : int -> int -> int * int -> string -> string -> int -> int -> int -> t
+val v : int -> encoding list -> int * int -> string -> string -> int -> int -> int -> t
 val of_buffer : Eio.Buf_read.t -> (t, error) result
 val version : t -> int * int
 val system_identifier : t -> string

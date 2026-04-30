@@ -3,9 +3,17 @@ type error =
   | Unsupported_version of int * int
   | Truncated of string (* field name *)
 
+type encoding =
+  | GPS_time_type
+  | Waveform_data_packets_internal
+  | Waveform_data_packets_external
+  | Synthetic_return_numbers
+  | WKT
+  | Unknown of int (* bit position *)
+
 type t = {
   file_source_id : int;
-  global_encoding : int;
+  global_encoding : encoding list;
   version : int * int;
   system_identifier : string;
   generating_software : string;
@@ -27,6 +35,8 @@ let read_magic buf =
       | false -> Error Invalid_file_signature)
   | exception End_of_file -> Error (Truncated "File Signature")
 
+
+
 let read_uint16 buf =
   match Eio.Buf_read.take 2 buf with
   | s -> Ok (String.get_uint16_le s 0)
@@ -41,6 +51,25 @@ let skip_bytes n buf =
   match Eio.Buf_read.skip n buf with
   | () -> Ok ()
   | exception End_of_file -> Error (Truncated "skip")
+
+let read_global_encoding buf =
+  let* encoding = read_uint16 buf in
+  let rencodings = List.init 16 (fun idx ->
+    let bit = (encoding lsr idx) land 0x01 in
+    if bit = 1 then
+      let e = match idx with
+      | 0 -> GPS_time_type
+      | 1 -> Waveform_data_packets_internal
+      | 2 -> Waveform_data_packets_external
+      | 3 -> Synthetic_return_numbers
+      | 4 -> WKT
+      | x -> Unknown x
+      in Some e
+    else
+      None
+  )  in
+  let encodings = List.filter_map (fun x -> x) rencodings in
+  Ok encodings
 
 let read_version buf =
   try
@@ -80,7 +109,7 @@ let v file_source_id global_encoding version system_identifier
 let of_buffer buf =
   let* () = read_magic buf in
   let* file_source_id = read_uint16 buf in
-  let* global_encoding = read_uint16 buf in
+  let* global_encoding = read_global_encoding buf in
   let* () = skip_bytes 16 buf in
   (* GUID *)
   let* version = read_version buf in
@@ -99,18 +128,26 @@ let version t = t.version
 let system_identifier t = t.system_identifier
 let generating_software t = t.generating_software
 
-let pp_header fmt t =
-  let version_major, version_minor = t.version in
-  Format.fprintf fmt
-    "{ file_source_id = 0x%x; global_encoding = 0x%0x; version = %d.%d; \
-     system_identifier = \"%s\"; generating_software = \"%s\"; header_size = \
-     0x%x; offset_to_point_data = 0x%x; vlr_count = %d }"
-    t.file_source_id t.global_encoding version_major version_minor
-    t.system_identifier t.generating_software t.header_size
-    t.offset_to_point_data t.vlr_count
-
 let pp_error fmt = function
   | Invalid_file_signature -> Format.fprintf fmt "Invalid_file_signature"
   | Unsupported_version (maj, min) ->
       Format.fprintf fmt "Unsupported_version (%d, %d)" maj min
   | Truncated field -> Format.fprintf fmt "Truncated %S" field
+
+let pp_encoding fmt = function
+  | GPS_time_type -> Format.fprintf fmt "GPS_time_type"
+  | Waveform_data_packets_internal -> Format.fprintf fmt "Waveform_data_packets_internal"
+  | Waveform_data_packets_external -> Format.fprintf fmt "Waveform_data_packets_external"
+  | Synthetic_return_numbers -> Format.fprintf fmt "Synthetic_return_numbers"
+  | WKT -> Format.fprintf fmt "WKT"
+  | Unknown bit -> Format.fprintf fmt "Unknown %d" bit
+
+let pp_header fmt t =
+  let version_major, version_minor = t.version in
+  Format.fprintf fmt
+    "{ file_source_id = 0x%x; global_encoding = [%a]; version = %d.%d; \
+     system_identifier = \"%s\"; generating_software = \"%s\"; header_size = \
+     0x%x; offset_to_point_data = 0x%x; vlr_count = %d }"
+    t.file_source_id (Format.pp_print_list pp_encoding) t.global_encoding version_major version_minor
+    t.system_identifier t.generating_software t.header_size
+    t.offset_to_point_data t.vlr_count

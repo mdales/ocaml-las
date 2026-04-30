@@ -1,4 +1,4 @@
 (executable
  (public_name oclas)
  (name main)
- (libraries oclas))
+ (libraries oclas eio_main))
