@@ -19,13 +19,18 @@ type t = {
   generating_software : string;
   header_size : int;
   offset_to_point_data : int;
-  vlr_count : int;
+  variable_length_record_count : int;
   point_data_record_format : int;
   point_data_record_length : int;
   scale : float * float * float;
   offset : float * float * float;
   min : float * float * float;
   max : float * float * float;
+  start_of_waveform_data_packet_record : int;
+  start_of_first_extended_variable_length_record : int;
+  number_of_extended_variable_length_records : int;
+  number_of_point_records : int;
+  number_of_points_by_return : int list;
 }
 
 let las_magic = "LASF"
@@ -53,6 +58,20 @@ let read_uint32 buf =
   match Eio.Buf_read.LE.uint32 buf with
   | v -> Ok (Int32.to_int v land 0xFFFFFFFF)
   | exception End_of_file -> Error (Truncated "uint32")
+
+let read_uint64 buf =
+  try
+    let s = Eio.Buf_read.take 8 buf in
+    Ok (Int64.to_int (String.get_int64_le s 0))
+  with End_of_file -> Error (Truncated "uint64")
+
+let read_uint64_list buf n =
+  try
+    Ok
+      (List.init n (fun _ ->
+           let s = Eio.Buf_read.take 8 buf in
+           Int64.to_int (String.get_int64_le s 0)))
+  with End_of_file -> Error (Truncated "uint64 list")
 
 let read_double buf =
   try
@@ -115,8 +134,13 @@ let read_string n buf =
 (* Public *)
 
 let v file_source_id global_encoding version system_identifier
-    generating_software header_size offset_to_point_data vlr_count
-    point_data_record_format point_data_record_length scale offset min max =
+    generating_software header_size offset_to_point_data
+    variable_length_record_count point_data_record_format
+    point_data_record_length scale offset min max
+    start_of_waveform_data_packet_record
+    start_of_first_extended_variable_length_record
+    number_of_extended_variable_length_records number_of_point_records
+    number_of_points_by_return =
   {
     file_source_id;
     global_encoding;
@@ -125,13 +149,18 @@ let v file_source_id global_encoding version system_identifier
     generating_software;
     header_size;
     offset_to_point_data;
-    vlr_count;
+    variable_length_record_count;
     point_data_record_format;
     point_data_record_length;
     scale;
     offset;
     min;
     max;
+    start_of_waveform_data_packet_record;
+    start_of_first_extended_variable_length_record;
+    number_of_extended_variable_length_records;
+    number_of_point_records;
+    number_of_points_by_return;
   }
 
 let of_buffer buf =
@@ -162,11 +191,20 @@ let of_buffer buf =
   let* min_y = read_double buf in
   let* max_z = read_double buf in
   let* min_z = read_double buf in
+  let* start_of_waveform_data_packet_record = read_uint64 buf in
+  let* start_of_first_extended_variable_length_record = read_uint64 buf in
+  let* number_of_extended_variable_length_records = read_uint32 buf in
+  let* number_of_point_records = read_uint64 buf in
+  let* number_of_points_by_return = read_uint64_list buf 15 in
   Result.Ok
     (v file_source_id global_encoding version system_identifier
        generating_software header_size offset_to_point_data vlr_count
        point_data_record_format point_data_record_length scale offset
-       (min_x, min_y, min_z) (max_x, max_y, max_z))
+       (min_x, min_y, min_z) (max_x, max_y, max_z)
+       start_of_waveform_data_packet_record
+       start_of_first_extended_variable_length_record
+       number_of_extended_variable_length_records number_of_point_records
+       number_of_points_by_return)
 
 let global_encoding t = t.global_encoding
 let version t = t.version
@@ -201,10 +239,19 @@ let pp_header fmt t =
      0x%x; offset_to_point_data = 0x%x; vlr_count = %d; \
      point_data_record_format = 0x%x; point_data_record_length = %d; scale = \
      (%f, %f, %f); offset = (%f, %f, %f); min = (%f, %f, %f); max = (%f, %f, \
-     %f) }"
+     %f); start_of_waveform_data_packet_record = 0x%x; \
+     start_of_first_extended_variable_length_record = 0x%x;\n\
+    \      number_of_extended_variable_length_records = %d; \
+     number_of_point_records = %d; number_of_points_by_return = [%a]}"
     t.file_source_id
     (Format.pp_print_list pp_encoding)
     t.global_encoding version_major version_minor t.system_identifier
-    t.generating_software t.header_size t.offset_to_point_data t.vlr_count
-    t.point_data_record_format t.point_data_record_length scale_x scale_y
-    scale_z offset_x offset_y offset_z min_x min_y min_z max_x max_y max_z
+    t.generating_software t.header_size t.offset_to_point_data
+    t.variable_length_record_count t.point_data_record_format
+    t.point_data_record_length scale_x scale_y scale_z offset_x offset_y
+    offset_z min_x min_y min_z max_x max_y max_z
+    t.start_of_waveform_data_packet_record
+    t.start_of_first_extended_variable_length_record
+    t.number_of_extended_variable_length_records t.number_of_point_records
+    (Format.pp_print_list Format.pp_print_int)
+    t.number_of_points_by_return

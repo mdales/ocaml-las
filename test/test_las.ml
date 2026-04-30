@@ -12,6 +12,11 @@ let bytes_of_uint32_le n =
   Bytes.set_int32_le b 0 (Int32.of_int n);
   Bytes.to_string b
 
+let bytes_of_uint64_le n =
+  let b = Bytes.create 8 in
+  Bytes.set_int64_le b 0 (Int64.of_int n);
+  Bytes.to_string b
+
 let bytes_of_double_le f =
   let b = Bytes.create 8 in
   Bytes.set_int64_le b 0 (Int64.bits_of_float f);
@@ -77,6 +82,28 @@ let test_header =
          bytes_of_double_le 60.0;
          bytes_of_double_le 700.0;
          bytes_of_double_le 70.0;
+         (* min max *)
+         bytes_of_uint64_le 1;
+         bytes_of_uint64_le 2;
+         bytes_of_uint32_le 3;
+         bytes_of_uint64_le 4;
+         (* *)
+         bytes_of_uint64_le 10;
+         bytes_of_uint64_le 11;
+         bytes_of_uint64_le 12;
+         bytes_of_uint64_le 13;
+         bytes_of_uint64_le 14;
+         bytes_of_uint64_le 15;
+         bytes_of_uint64_le 16;
+         bytes_of_uint64_le 17;
+         bytes_of_uint64_le 18;
+         bytes_of_uint64_le 19;
+         bytes_of_uint64_le 20;
+         bytes_of_uint64_le 21;
+         bytes_of_uint64_le 22;
+         bytes_of_uint64_le 23;
+         bytes_of_uint64_le 24;
+         (* number_of_points_by_return *)
        ])
 
 let ok_header = Alcotest.(result (of_pp Las.pp_header) (of_pp Las.pp_error))
@@ -87,7 +114,8 @@ let test_valid_header () =
     Las.v 32
       [ Las.GPS_time_type; Las.WKT ]
       (1, 4) "system" "software" 42 123 234 0 10 (1., 2., 3.) (11., 12., 13.)
-      (50., 60., 70.) (500., 600., 700.)
+      (50., 60., 70.) (500., 600., 700.) 1 2 3 4
+      (List.init 15 (fun i -> i + 10))
   in
   Alcotest.(check ok_header) "valid magic" (Ok expected) result
 

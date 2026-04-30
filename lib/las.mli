@@ -28,6 +28,11 @@ val v :
   float * float * float ->
   float * float * float ->
   float * float * float ->
+  int ->
+  int ->
+  int ->
+  int ->
+  int list ->
   t
 
 val of_buffer : Eio.Buf_read.t -> (t, error) result
