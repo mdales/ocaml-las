@@ -1,3 +1,4 @@
 (library
  (name oclas)
+ (enabled_if (= %{ocaml-config:word_size} "64"))
  (libraries eio))
