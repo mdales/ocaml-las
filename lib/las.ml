@@ -24,6 +24,8 @@ type t = {
   point_data_record_length : int;
   scale : float * float * float;
   offset : float * float * float;
+  min : float * float * float;
+  max : float * float * float;
 }
 
 let las_magic = "LASF"
@@ -114,7 +116,7 @@ let read_string n buf =
 
 let v file_source_id global_encoding version system_identifier
     generating_software header_size offset_to_point_data vlr_count
-    point_data_record_format point_data_record_length scale offset =
+    point_data_record_format point_data_record_length scale offset min max =
   {
     file_source_id;
     global_encoding;
@@ -128,6 +130,8 @@ let v file_source_id global_encoding version system_identifier
     point_data_record_length;
     scale;
     offset;
+    min;
+    max;
   }
 
 let of_buffer buf =
@@ -152,10 +156,17 @@ let of_buffer buf =
   (* Legacy number of point by returns *)
   let* scale = read_double_triple buf in
   let* offset = read_double_triple buf in
+  let* max_x = read_double buf in
+  let* min_x = read_double buf in
+  let* max_y = read_double buf in
+  let* min_y = read_double buf in
+  let* max_z = read_double buf in
+  let* min_z = read_double buf in
   Result.Ok
     (v file_source_id global_encoding version system_identifier
        generating_software header_size offset_to_point_data vlr_count
-       point_data_record_format point_data_record_length scale offset)
+       point_data_record_format point_data_record_length scale offset
+       (min_x, min_y, min_z) (max_x, max_y, max_z))
 
 let global_encoding t = t.global_encoding
 let version t = t.version
@@ -182,15 +193,18 @@ let pp_header fmt t =
   let version_major, version_minor = t.version in
   let scale_x, scale_y, scale_z = t.scale in
   let offset_x, offset_y, offset_z = t.offset in
+  let min_x, min_y, min_z = t.min in
+  let max_x, max_y, max_z = t.max in
   Format.fprintf fmt
     "{ file_source_id = 0x%x; global_encoding = [%a]; version = %d.%d; \
      system_identifier = \"%s\"; generating_software = \"%s\"; header_size = \
      0x%x; offset_to_point_data = 0x%x; vlr_count = %d; \
      point_data_record_format = 0x%x; point_data_record_length = %d; scale = \
-     (%f, %f, %f); offset = (%f, %f, %f) }"
+     (%f, %f, %f); offset = (%f, %f, %f); min = (%f, %f, %f); max = (%f, %f, \
+     %f) }"
     t.file_source_id
     (Format.pp_print_list pp_encoding)
     t.global_encoding version_major version_minor t.system_identifier
     t.generating_software t.header_size t.offset_to_point_data t.vlr_count
     t.point_data_record_format t.point_data_record_length scale_x scale_y
-    scale_z offset_x offset_y offset_z
+    scale_z offset_x offset_y offset_z min_x min_y min_z max_x max_y max_z

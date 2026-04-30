@@ -71,6 +71,12 @@ let test_header =
          bytes_of_double_le 12.0;
          bytes_of_double_le 13.0;
          (* offset *)
+         bytes_of_double_le 500.0;
+         bytes_of_double_le 50.0;
+         bytes_of_double_le 600.0;
+         bytes_of_double_le 60.0;
+         bytes_of_double_le 700.0;
+         bytes_of_double_le 70.0;
        ])
 
 let ok_header = Alcotest.(result (of_pp Las.pp_header) (of_pp Las.pp_error))
@@ -81,6 +87,7 @@ let test_valid_header () =
     Las.v 32
       [ Las.GPS_time_type; Las.WKT ]
       (1, 4) "system" "software" 42 123 234 0 10 (1., 2., 3.) (11., 12., 13.)
+      (50., 60., 70.) (500., 600., 700.)
   in
   Alcotest.(check ok_header) "valid magic" (Ok expected) result
 
