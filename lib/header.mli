@@ -1,7 +1,3 @@
-type error =
-  | Invalid_file_signature
-  | Unsupported_version of int * int
-  | Truncated of string (* field name *)
 
 type encoding =
   | GPS_time_type
@@ -35,11 +31,10 @@ val v :
   int list ->
   t
 
-val of_buffer : Eio.Buf_read.t -> (t, error) result
+val of_buffer : Eio.Buf_read.t -> (t, Util.error) result
 val global_encoding : t -> encoding list
 val version : t -> int * int
 val system_identifier : t -> string
 val generating_software : t -> string
-val pp_error : Format.formatter -> error -> unit
 val pp_encoding : Format.formatter -> encoding -> unit
 val pp_header : Format.formatter -> t -> unit

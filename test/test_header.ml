@@ -1,36 +1,5 @@
 open Oclas
-
-let bytes_of_uint8 n = String.make 1 (Char.chr n)
-
-let bytes_of_uint16_le n =
-  let b = Bytes.create 2 in
-  Bytes.set_uint16_le b 0 n;
-  Bytes.to_string b
-
-let bytes_of_uint32_le n =
-  let b = Bytes.create 4 in
-  Bytes.set_int32_le b 0 (Int32.of_int n);
-  Bytes.to_string b
-
-let bytes_of_uint64_le n =
-  let b = Bytes.create 8 in
-  Bytes.set_int64_le b 0 (Int64.of_int n);
-  Bytes.to_string b
-
-let bytes_of_double_le f =
-  let b = Bytes.create 8 in
-  Bytes.set_int64_le b 0 (Int64.bits_of_float f);
-  Bytes.to_string b
-
-let padded_string s n =
-  let l = String.length s in
-  match Int.compare l n with
-  | 0 -> s
-  | c when c < 0 -> s ^ String.make (n - l) '\x00'
-  | _ -> failwith "String too long"
-
-let make_buf s =
-  Eio.Buf_read.of_flow (Eio.Flow.string_source s) ~max_size:max_int
+open Utils
 
 let test_header =
   make_buf
@@ -106,7 +75,7 @@ let test_header =
          (* number_of_points_by_return *)
        ])
 
-let ok_header = Alcotest.(result (of_pp Header.pp_header) (of_pp Header.pp_error))
+let ok_header = Alcotest.(result (of_pp Header.pp_header) (of_pp Util.pp_error))
 
 let test_valid_header () =
   let result = Header.of_buffer test_header in
@@ -144,23 +113,23 @@ let test_unsupported_minor_version () =
 let test_wrong_magic () =
   let result = Header.of_buffer (make_buf "XXXX\x00\x00\x00\x00") in
   Alcotest.(check ok_header)
-    "wrong magic" (Error Header.Invalid_file_signature) result
+    "wrong magic" (Error Util.Invalid_file_signature) result
 
 let test_truncated_input () =
   (* Fewer than 4 bytes — the reader should return false, not raise *)
   let result = Header.of_buffer (make_buf "LAS") in
   Alcotest.(check ok_header)
-    "truncated input" (Error (Header.Truncated "File Signature")) result
+    "truncated input" (Error (Util.Truncated "File Signature")) result
 
 let test_empty_input () =
   let result = Header.of_buffer (make_buf "") in
   Alcotest.(check ok_header)
-    "truncated input" (Error (Header.Truncated "File Signature")) result
+    "truncated input" (Error (Util.Truncated "File Signature")) result
 
 let () =
-  Alcotest.run "Las_magic"
+  Alcotest.run "LAS header"
     [
-      ( "magic",
+      ( "headers",
         [
           Alcotest.test_case "valid magic bytes" `Quick test_valid_header;
           Alcotest.test_case "wrong major version" `Quick

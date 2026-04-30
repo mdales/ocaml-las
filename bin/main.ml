@@ -13,5 +13,5 @@ let () =
   match Header.of_buffer buf with
   | Ok header -> Format.printf "%a\n" Header.pp_header header
   | Error e ->
-      Format.eprintf "Error: %a\n" Header.pp_error e;
+      Format.eprintf "Error: %a\n" Util.pp_error e;
       exit 1

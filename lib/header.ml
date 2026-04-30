@@ -1,7 +1,4 @@
-type error =
-  | Invalid_file_signature
-  | Unsupported_version of int * int
-  | Truncated of string (* field name *)
+open Util.Operators
 
 type encoding =
   | GPS_time_type
@@ -34,7 +31,7 @@ type t = {
 }
 
 let las_magic = "LASF"
-let ( let* ) = Result.bind
+
 
 (* Private helpers *)
 
@@ -43,55 +40,17 @@ let read_magic buf =
   | s -> (
       match String.equal s las_magic with
       | true -> Ok ()
-      | false -> Error Invalid_file_signature)
+      | false -> Error Util.Invalid_file_signature)
   | exception End_of_file -> Error (Truncated "File Signature")
 
-let read_byte buf =
-  try Ok (Eio.Buf_read.uint8 buf) with End_of_file -> Error (Truncated "byte")
-
-let read_uint16 buf =
-  match Eio.Buf_read.take 2 buf with
-  | s -> Ok (String.get_uint16_le s 0)
-  | exception End_of_file -> Error (Truncated "uint16")
-
-let read_uint32 buf =
-  match Eio.Buf_read.LE.uint32 buf with
-  | v -> Ok (Int32.to_int v land 0xFFFFFFFF)
-  | exception End_of_file -> Error (Truncated "uint32")
-
-let read_uint64 buf =
-  try
-    let s = Eio.Buf_read.take 8 buf in
-    Ok (Int64.to_int (String.get_int64_le s 0))
-  with End_of_file -> Error (Truncated "uint64")
-
-let read_uint64_list buf n =
-  try
-    Ok
-      (List.init n (fun _ ->
-           let s = Eio.Buf_read.take 8 buf in
-           Int64.to_int (String.get_int64_le s 0)))
-  with End_of_file -> Error (Truncated "uint64 list")
-
-let read_double buf =
-  try
-    let s = Eio.Buf_read.take 8 buf in
-    Ok (Int64.float_of_bits (String.get_int64_le s 0))
-  with End_of_file -> Error (Truncated "double")
-
 let read_double_triple buf =
-  let* x = read_double buf in
-  let* y = read_double buf in
-  let* z = read_double buf in
+  let* x = Util.read_double buf in
+  let* y = Util.read_double buf in
+  let* z = Util.read_double buf in
   Ok (x, y, z)
 
-let skip_bytes n buf =
-  match Eio.Buf_read.skip n buf with
-  | () -> Ok ()
-  | exception End_of_file -> Error (Truncated "skip")
-
 let read_global_encoding buf =
-  let* encoding = read_uint16 buf in
+  let* encoding = Util.read_uint16 buf in
   let rencodings =
     List.init 16 (fun idx ->
         let bit = (encoding lsr idx) land 0x01 in
@@ -115,21 +74,10 @@ let read_version buf =
   try
     let major = Eio.Buf_read.uint8 buf in
     let minor = Eio.Buf_read.uint8 buf in
-    if major <> 1 || minor > 5 then Error (Unsupported_version (major, minor))
+    if major <> 1 || minor > 5 then Error (Util.Unsupported_version (major, minor))
     else Ok (major, minor)
-  with End_of_file -> Error (Truncated "version")
+  with End_of_file -> Error (Util.Truncated "version")
 
-let read_string n buf =
-  try
-    let s = Eio.Buf_read.take n buf in
-    (* Find first null byte; if none, use full length *)
-    let len =
-      match String.index_opt s '\x00' with
-      | Some i -> i
-      | None -> String.length s
-    in
-    Ok (String.sub s 0 len)
-  with End_of_file -> Error (Truncated "string")
 
 (* Public *)
 
@@ -165,37 +113,37 @@ let v file_source_id global_encoding version system_identifier
 
 let of_buffer buf =
   let* () = read_magic buf in
-  let* file_source_id = read_uint16 buf in
+  let* file_source_id = Util.read_uint16 buf in
   let* global_encoding = read_global_encoding buf in
-  let* () = skip_bytes 16 buf in
+  let* () = Util.skip_bytes 16 buf in
   (* GUID *)
   let* version = read_version buf in
-  let* system_identifier = read_string 32 buf in
-  let* generating_software = read_string 32 buf in
-  let* () = skip_bytes 4 buf in
+  let* system_identifier = Util.read_string 32 buf in
+  let* generating_software = Util.read_string 32 buf in
+  let* () = Util.skip_bytes 4 buf in
   (* dates *)
-  let* header_size = read_uint16 buf in
-  let* offset_to_point_data = read_uint32 buf in
-  let* vlr_count = read_uint32 buf in
-  let* point_data_record_format = read_byte buf in
-  let* point_data_record_length = read_uint16 buf in
-  let* () = skip_bytes 4 buf in
+  let* header_size = Util.read_uint16 buf in
+  let* offset_to_point_data = Util.read_uint32 buf in
+  let* vlr_count = Util.read_uint32 buf in
+  let* point_data_record_format = Util.read_byte buf in
+  let* point_data_record_length = Util.read_uint16 buf in
+  let* () = Util.skip_bytes 4 buf in
   (* Legacy number of point records *)
-  let* () = skip_bytes 20 buf in
+  let* () = Util.skip_bytes 20 buf in
   (* Legacy number of point by returns *)
   let* scale = read_double_triple buf in
   let* offset = read_double_triple buf in
-  let* max_x = read_double buf in
-  let* min_x = read_double buf in
-  let* max_y = read_double buf in
-  let* min_y = read_double buf in
-  let* max_z = read_double buf in
-  let* min_z = read_double buf in
-  let* start_of_waveform_data_packet_record = read_uint64 buf in
-  let* start_of_first_extended_variable_length_record = read_uint64 buf in
-  let* number_of_extended_variable_length_records = read_uint32 buf in
-  let* number_of_point_records = read_uint64 buf in
-  let* number_of_points_by_return = read_uint64_list buf 15 in
+  let* max_x = Util.read_double buf in
+  let* min_x = Util.read_double buf in
+  let* max_y = Util.read_double buf in
+  let* min_y = Util.read_double buf in
+  let* max_z = Util.read_double buf in
+  let* min_z = Util.read_double buf in
+  let* start_of_waveform_data_packet_record = Util.read_uint64 buf in
+  let* start_of_first_extended_variable_length_record = Util.read_uint64 buf in
+  let* number_of_extended_variable_length_records = Util.read_uint32 buf in
+  let* number_of_point_records = Util.read_uint64 buf in
+  let* number_of_points_by_return = Util.read_uint64_list buf 15 in
   Result.Ok
     (v file_source_id global_encoding version system_identifier
        generating_software header_size offset_to_point_data vlr_count
@@ -210,12 +158,6 @@ let global_encoding t = t.global_encoding
 let version t = t.version
 let system_identifier t = t.system_identifier
 let generating_software t = t.generating_software
-
-let pp_error fmt = function
-  | Invalid_file_signature -> Format.fprintf fmt "Invalid_file_signature"
-  | Unsupported_version (maj, min) ->
-      Format.fprintf fmt "Unsupported_version (%d, %d)" maj min
-  | Truncated field -> Format.fprintf fmt "Truncated %S" field
 
 let pp_encoding fmt = function
   | GPS_time_type -> Format.fprintf fmt "GPS_time_type"
