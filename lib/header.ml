@@ -140,9 +140,8 @@ let of_buffer buf =
   let* vlr_count = Util.read_uint32 buf in
   let* point_data_record_format = Util.read_byte buf in
   let* point_data_record_length = Util.read_uint16 buf in
-  let* () = Util.skip_bytes 4 buf in
-  (* Legacy number of point records *)
-  let* () = Util.skip_bytes 20 buf in
+  let* legacy_number_of_point_records = Util.read_uint32 buf in
+  let* legacy_number_of_point_by_return = Util.read_uint32_list buf 5 in
   (* Legacy number of point by returns *)
   let* scale = read_double_triple buf in
   let* offset = read_double_triple buf in
@@ -158,7 +157,8 @@ let of_buffer buf =
       (v file_source_id global_encoding version system_identifier
          generating_software header_size offset_to_point_data vlr_count
          point_data_record_format point_data_record_length scale offset
-         (min_x, min_y, min_z) (max_x, max_y, max_z) 0 0 0 0 [] 0. 0. 0)
+         (min_x, min_y, min_z) (max_x, max_y, max_z) 0 0 0
+         legacy_number_of_point_records legacy_number_of_point_by_return 0. 0. 0)
   else
     let* start_of_waveform_data_packet_record = Util.read_uint64 buf in
 
@@ -168,7 +168,9 @@ let of_buffer buf =
            generating_software header_size offset_to_point_data vlr_count
            point_data_record_format point_data_record_length scale offset
            (min_x, min_y, min_z) (max_x, max_y, max_z)
-           start_of_waveform_data_packet_record 0 0 0 [] 0. 0. 0)
+           start_of_waveform_data_packet_record 0 0
+           legacy_number_of_point_records legacy_number_of_point_by_return 0. 0.
+           0)
     else
       let* start_of_first_extended_variable_length_record =
         Util.read_uint64 buf
@@ -176,6 +178,13 @@ let of_buffer buf =
       let* number_of_extended_variable_length_records = Util.read_uint32 buf in
       let* number_of_point_records = Util.read_uint64 buf in
       let* number_of_points_by_return = Util.read_uint64_list buf 15 in
+
+      let nopr, nopby =
+        if legacy_number_of_point_records != 0 then
+          (legacy_number_of_point_records, legacy_number_of_point_by_return)
+        else (number_of_point_records, number_of_points_by_return)
+      in
+
       if minor_version < 5 then
         Result.Ok
           (v file_source_id global_encoding version system_identifier
@@ -184,8 +193,7 @@ let of_buffer buf =
              (min_x, min_y, min_z) (max_x, max_y, max_z)
              start_of_waveform_data_packet_record
              start_of_first_extended_variable_length_record
-             number_of_extended_variable_length_records number_of_point_records
-             number_of_points_by_return 0. 0. 0)
+             number_of_extended_variable_length_records nopr nopby 0. 0. 0)
       else
         let* max_gps_time = Util.read_double buf in
         let* min_gps_time = Util.read_double buf in
@@ -197,14 +205,18 @@ let of_buffer buf =
              (min_x, min_y, min_z) (max_x, max_y, max_z)
              start_of_waveform_data_packet_record
              start_of_first_extended_variable_length_record
-             number_of_extended_variable_length_records number_of_point_records
-             number_of_points_by_return max_gps_time min_gps_time time_offset)
+             number_of_extended_variable_length_records nopr nopby max_gps_time
+             min_gps_time time_offset)
 
 let global_encoding t = t.global_encoding
 let version t = t.version
 let system_identifier t = t.system_identifier
 let generating_software t = t.generating_software
 let variable_length_record_count t = t.variable_length_record_count
+let point_data_record_format t = t.point_data_record_format
+let bounds t = (t.min, t.max)
+let number_of_point_records t = t.number_of_point_records
+let number_of_points_by_return t = t.number_of_points_by_return
 
 let pp_encoding fmt = function
   | GPS_time_type -> Format.fprintf fmt "GPS_time_type"

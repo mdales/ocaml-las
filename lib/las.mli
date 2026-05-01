@@ -11,3 +11,7 @@ val vlrs : t -> Vlr.t list
 
 val projection : t -> string
 (** [projection t] Returns the WKT of the CRS used for the point data. *)
+
+val is_laz : t -> bool
+(** [is_laz t] Returns true of the file is a compressed LAZ file, false if it is
+    an uncompressed LAS file. *)

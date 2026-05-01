@@ -31,3 +31,13 @@ let projection t =
   | [ x ] -> Vlr.data x
   | [] -> failwith "No projection found"
   | _ -> failwith "Multiple projections found"
+
+let is_laz t =
+  (* There seems to be multiple indicators that this is a LAZ file rather than
+  a LAS file:
+    * Point Data Record Format has top bit set (e.g., 0x87 rather than 0x07)
+    * There is a VLR with the user ID "laszip encoded".
+    We could test for all, but for now one will suffice I suspect.
+  *)
+  let pdrf = Header.point_data_record_format t.header in
+  pdrf land 0x80 = 0x80

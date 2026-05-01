@@ -28,6 +28,15 @@ let read_uint32 buf =
   | v -> Ok (Int32.to_int v land 0xFFFFFFFF)
   | exception End_of_file -> Error (Truncated "uint32")
 
+let read_uint32_list buf n =
+  try
+    Ok
+      (List.init n (fun _ ->
+           match Eio.Buf_read.LE.uint32 buf with
+           | v -> Int32.to_int v land 0xFFFFFFFF
+           | exception e -> raise e))
+  with End_of_file -> Error (Truncated "uint32 list")
+
 let read_uint64 buf =
   try
     let s = Eio.Buf_read.take 8 buf in
