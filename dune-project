@@ -5,22 +5,24 @@
 (generate_opam_files true)
 
 (source
- (github username/reponame))
+ (github geocaml/ocaml-las))
 
-(authors "Author Name <author@example.com>")
+(authors "Michael Dales <michael@digitalflapjack.com>")
 
-(maintainers "Maintainer Name <maintainer@example.com>")
+(maintainers "Michael Dales <michael@digitalflapjack.com>")
 
-(license LICENSE)
+(maintenance_intent "(latest)")
 
-(documentation https://url/to/documentation)
+(license ISC)
+
+(documentation https://github.com/geocaml/ocaml-las)
 
 (package
  (name oclas)
- (synopsis "A short synopsis")
- (description "A longer description")
- (depends ocaml)
+ (synopsis "Library for reading point cloud data")
+ (description "A library for reading and working with LAS, LAZ, and COPC based point cloud data.")
+ (depends (ocaml (>= 5.1)) dune eio_main (alcotest :with-test) (odoc :with-doc) (ocamlformat (and (>= 0.29.0) :with-dev-setup )))
  (tags
-  ("add topics" "to describe" your project)))
+  (GIS las laz "point cloud")))
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/reference/dune-project/index.html
