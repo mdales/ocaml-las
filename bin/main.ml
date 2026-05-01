@@ -14,7 +14,11 @@ let () =
   | Ok las ->
       let header = Las.header las in
       let version_major, version_minor = Header.version header
-      and format = match (Las.is_laz las) with true -> "Compressed LAZ file" | false -> "Uncompressed LAS file" in
+      and format =
+        match Las.is_laz las with
+        | true -> "Compressed LAZ file"
+        | false -> "Uncompressed LAS file"
+      in
       Format.printf "%s, version %d.%d\n" format version_major version_minor;
       let point_count = Header.number_of_point_records header in
       Format.printf "Total points count: %d\n" point_count;
